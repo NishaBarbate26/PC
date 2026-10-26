@@ -1,0 +1,56 @@
+
+# VS CODE SETUP AND EXECUTION COMMANDS:
+# 1. Install Python 3.
+# 2. Open the terminal in VS Code.
+# 3. Install the required library:
+#    python -m pip install networkx
+# 4. Run the program:
+#    python pagerank.py
+
+import networkx as nx
+
+graph = nx.DiGraph()
+
+graph.add_edges_from([
+    ("A", "B"),
+    ("A", "C"),
+    ("B", "C"),
+    ("C", "A"),
+    ("D", "C")
+])
+
+pagerank = nx.pagerank(graph, alpha=0.85)
+
+print("PageRank Scores:")
+
+for page, score in sorted(pagerank.items()):
+    print(f"Page {page}: {score:.4f}")
+
+print("\nPages Ranked by Importance:")
+
+ranked_pages = sorted(
+    pagerank.items(),
+    key=lambda item: item[1],
+    reverse=True
+)
+
+for rank, (page, score) in enumerate(ranked_pages, start=1):
+    print(f"{rank}. Page {page} - {score:.4f}")
+
+
+# LINE-BY-LINE EXPLANATION:
+# import networkx: Imports the library for creating and analyzing graphs.
+# nx.DiGraph(): Creates a directed graph representing web pages and links.
+# graph.add_edges_from(): Adds links between web pages.
+# ("A", "B"): Represents a link from page A to page B.
+# nx.pagerank(): Calculates PageRank scores for all pages.
+# alpha=0.85: Sets the probability of following links to 85 percent.
+# print(): Displays the PageRank results heading.
+# sorted(pagerank.items()): Sorts pages alphabetically for consistent output.
+# for page, score: Iterates through each page and its PageRank score.
+# f-string: Displays each page's score rounded to four decimal places.
+# ranked_pages: Stores pages sorted by importance.
+# key=lambda item: item[1]: Sorts using each page's score.
+# reverse=True: Places the highest score first.
+# enumerate(): Numbers the ranked pages starting from 1.
+# print(): Displays the rank, page name, and score.

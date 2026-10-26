@@ -1,0 +1,53 @@
+# VS CODE SETUP AND EXECUTION COMMANDS:
+# 1. Install Python 3.
+# 2. Open the terminal in VS Code.
+# 3. Install the required library:
+#    python -m pip install nltk
+# 4. Run the program:
+#    python text_preprocessing.py
+
+import nltk
+import re
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+
+nltk.download('stopwords', quiet=True)
+
+text = """The students are learning and studying different subjects.
+They were playing games and running quickly."""
+
+text = text.lower()
+
+text = re.sub(r'[^a-z\s]', '', text)
+
+words = text.split()
+
+stop_words = set(stopwords.words('english'))
+
+filtered_words = [word for word in words if word not in stop_words]
+
+stemmer = PorterStemmer()
+
+stemmed_words = [stemmer.stem(word) for word in filtered_words]
+
+print("Original Text:\n", text)
+print("\nWords after Stop Word Removal:\n", filtered_words)
+print("\nWords after Stemming:\n", stemmed_words)
+
+
+# LINE-BY-LINE EXPLANATION:
+# import nltk: Imports the Natural Language Toolkit library.
+# import re: Imports tools for text pattern matching.
+# from nltk.corpus import stopwords: Imports the English stop-word list.
+# from nltk.stem import PorterStemmer: Imports the stemming algorithm.
+# nltk.download(): Downloads the required English stop-word data.
+# text = ...: Stores the sample text document.
+# text.lower(): Converts all letters into lowercase.
+# re.sub(): Removes punctuation, digits, and special characters.
+# text.split(): Splits the text into individual words.
+# stopwords.words(): Loads common English stop words.
+# set(): Stores stop words for efficient lookup.
+# filtered_words: Keeps words that are not stop words.
+# PorterStemmer(): Creates a stemming object.
+# stemmer.stem(): Reduces each word to its stem.
+# print(): Displays the original text, filtered words, and stemmed words.

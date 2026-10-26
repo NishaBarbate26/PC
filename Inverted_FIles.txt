@@ -1,0 +1,65 @@
+
+# VS CODE SETUP AND EXECUTION COMMANDS:
+# 1. Install Python 3.
+# 2. Open the terminal in VS Code.
+# 3. No external libraries are required.
+# 4. Run the program:
+#    python inverted_file.py
+
+import re
+from collections import defaultdict
+
+documents = {
+    "D1": "Python is a programming language",
+    "D2": "Python is used for data science",
+    "D3": "Data science uses machine learning"
+}
+
+inverted_index = defaultdict(list)
+
+for doc_id, text in documents.items():
+    words = re.findall(r'\b\w+\b', text.lower())
+    for word in set(words):
+        inverted_index[word].append(doc_id)
+
+print("Inverted File:")
+for word, doc_ids in sorted(inverted_index.items()):
+    print(word, ":", doc_ids)
+
+query = input("\nEnter search query: ").lower()
+query_words = re.findall(r'\b\w+\b', query)
+
+result = set()
+for word in query_words:
+    result.update(inverted_index.get(word, []))
+
+print("\nRetrieved Documents:")
+if result:
+    for doc_id in sorted(result):
+        print(doc_id, ":", documents[doc_id])
+else:
+    print("No matching documents found.")
+
+
+# LINE-BY-LINE EXPLANATION:
+# import re: Imports regular expression tools for extracting words.
+# defaultdict: Creates dictionary entries automatically when needed.
+# documents: Stores document IDs and their text.
+# defaultdict(list): Creates an inverted index with word-to-document lists.
+# for doc_id, text: Processes each document and its ID.
+# re.findall(): Extracts words from the document.
+# lower(): Converts text to lowercase for case-insensitive matching.
+# set(words): Removes duplicate words within a document.
+# inverted_index[word].append(doc_id): Records which document contains each word.
+# print(): Displays the inverted index.
+# sorted(): Displays index entries in alphabetical order.
+# input(): Accepts a search query from the user.
+# query_words: Extracts the query words and converts them to lowercase.
+# set(): Stores retrieved document IDs without duplicates.
+# for word in query_words: Checks each query word in the index.
+# inverted_index.get(): Retrieves document IDs for a word, or an empty list.
+# result.update(): Adds matching document IDs to the result set.
+# if result: Checks whether any documents matched the query.
+# sorted(result): Displays matching document IDs in order.
+# documents[doc_id]: Retrieves the original text of each matching document.
+# else: Displays a message when no documents match.

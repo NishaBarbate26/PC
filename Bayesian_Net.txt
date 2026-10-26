@@ -1,0 +1,175 @@
+
+# VS CODE SETUP AND EXECUTION COMMANDS:
+# 1. Install Python 3.10 or later.
+# 2. Open the terminal in VS Code.
+# 3. Install required libraries:
+#    python -m pip install pandas numpy pgmpy
+# 4. Internet connection is required to download the dataset.
+# 5. Run the program:
+#    python heart_disease_bn.py
+
+import pandas as pd
+import numpy as np
+from pgmpy.models import DiscreteBayesianNetwork
+from pgmpy.estimators import BayesianEstimator
+from pgmpy.inference import VariableElimination
+
+url = "https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/processed.cleveland.data"
+
+columns = [
+    "age", "sex", "cp", "trestbps", "chol", "fbs",
+    "restecg", "thalach", "exang", "oldpeak",
+    "slope", "ca", "thal", "target"
+]
+
+data = pd.read_csv(url, names=columns, na_values="?")
+data = data.dropna().copy()
+
+data["target"] = (data["target"] > 0).astype(int)
+
+data["age"] = pd.cut(
+    data["age"], bins=[0, 40, 55, 100],
+    labels=["young", "middle", "senior"]
+)
+
+data["sex"] = data["sex"].map({0: "female", 1: "male"})
+
+data["cp"] = data["cp"].astype(int).astype(str)
+
+data["chol"] = pd.cut(
+    data["chol"], bins=[0, 200, 240, np.inf],
+    labels=["normal", "high", "very_high"]
+)
+
+data["thalach"] = pd.cut(
+    data["thalach"], bins=[0, 100, 150, 250],
+    labels=["low", "medium", "high"]
+)
+
+data["oldpeak"] = pd.cut(
+    data["oldpeak"], bins=[-np.inf, 1, 2, np.inf],
+    labels=["low", "medium", "high"]
+)
+
+features = ["age", "sex", "cp", "chol", "thalach", "oldpeak"]
+data = data[features + ["target"]].dropna()
+
+data = data.rename(columns={"target": "disease"})
+
+for column in data.columns:
+    data[column] = data[column].astype(str)
+
+edges = [
+    ("age", "disease"),
+    ("sex", "disease"),
+    ("cp", "disease"),
+    ("chol", "disease"),
+    ("thalach", "disease"),
+    ("oldpeak", "disease")
+]
+
+model = DiscreteBayesianNetwork(edges)
+
+model.fit(
+    data,
+    estimator=BayesianEstimator,
+    prior_type="BDeu",
+    equivalent_sample_size=5
+)
+
+print("Bayesian Network Structure:")
+print(list(model.edges()))
+
+print("\nNumber of records used:", len(data))
+print("Model validation:", model.check_model())
+
+inference = VariableElimination(model)
+
+patient = {
+    "age": "middle",
+    "sex": "male",
+    "cp": "4",
+    "chol": "high",
+    "thalach": "medium",
+    "oldpeak": "high"
+}
+
+result = inference.query(
+    variables=["disease"],
+    evidence=patient,
+    show_progress=False
+)
+
+states = result.state_names["disease"]
+probabilities = result.values
+
+print("\nPatient Medical Details:")
+for feature, value in patient.items():
+    print(feature, ":", value)
+
+print("\nHeart Disease Diagnosis:")
+for state, probability in zip(states, probabilities):
+    label = "Disease Present" if state == "1" else "Disease Absent"
+    print(f"{label}: {probability * 100:.2f}%")
+
+prediction = states[int(np.argmax(probabilities))]
+
+if prediction == "1":
+    print("\nModel Prediction: Heart disease likely")
+else:
+    print("\nModel Prediction: Heart disease unlikely")
+
+
+# LINE-BY-LINE EXPLANATION:
+# import pandas: Loads tools for handling tabular medical data.
+# import numpy: Provides numerical operations and infinity values.
+# DiscreteBayesianNetwork: Creates a discrete Bayesian Network.
+# BayesianEstimator: Learns conditional probabilities from data.
+# VariableElimination: Calculates probabilities using the network.
+# url: Stores the official UCI Cleveland Heart Disease dataset address.
+# columns: Defines the names of the dataset's 14 columns.
+# pd.read_csv(): Downloads and reads the dataset into a DataFrame.
+# na_values="?": Treats question marks as missing values.
+# dropna(): Removes records with missing values.
+# copy(): Creates an independent copy of the cleaned data.
+# target > 0: Converts disease values 1–4 to present and 0 to absent.
+# astype(int): Stores the disease result as 0 or 1.
+# pd.cut(): Groups numerical ages into three categories.
+# age labels: Names the age groups young, middle, and senior.
+# sex map: Converts 0 to female and 1 to male.
+# cp conversion: Converts chest-pain categories into strings.
+# Cholesterol pd.cut(): Groups cholesterol into three categories.
+# Thalach pd.cut(): Groups maximum heart rate into three categories.
+# Oldpeak pd.cut(): Groups exercise-related ST depression into three categories.
+# features: Lists the six patient attributes used for diagnosis.
+# data selection: Keeps the six attributes and the disease outcome.
+# dropna(): Removes any records missing a selected attribute.
+# rename(): Changes target to disease for clarity.
+# for column: Iterates over each selected column.
+# astype(str): Converts categorical values to strings.
+# edges: Defines connections from patient attributes to disease.
+# DiscreteBayesianNetwork(edges): Constructs the network structure.
+# model.fit(): Learns conditional probability distributions from the dataset.
+# BayesianEstimator: Uses Bayesian smoothing when estimating probabilities.
+# prior_type="BDeu": Selects the BDeu probability prior.
+# equivalent_sample_size=5: Sets the prior's equivalent sample size.
+# print(): Displays the network connections.
+# model.edges(): Returns the directed network connections.
+# len(data): Counts the records used for training.
+# check_model(): Checks whether the network's probability distributions are valid.
+# VariableElimination(model): Creates the probability inference engine.
+# patient: Defines example medical details for a hypothetical patient.
+# inference.query(): Calculates disease probabilities given patient evidence.
+# variables=["disease"]: Requests probabilities for the disease outcome.
+# evidence=patient: Supplies the patient's observed attributes.
+# result.state_names: Retrieves the possible disease states.
+# result.values: Retrieves the calculated probabilities.
+# for feature, value: Iterates through the patient's medical details.
+# print(): Displays each patient attribute.
+# zip(): Pairs each disease state with its probability.
+# probability * 100: Converts probability to a percentage.
+# label: Converts the disease state into a readable description.
+# np.argmax(): Finds the index of the highest probability.
+# prediction: Selects the most probable disease state.
+# if prediction == "1": Checks whether disease presence is predicted.
+# else: Displays the alternative prediction.

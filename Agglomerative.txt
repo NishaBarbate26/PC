@@ -1,0 +1,63 @@
+
+# Aim: Implement Agglomerative Hierarchical Clustering
+
+# VS Code Setup:
+# 1. Install Python 3.
+# 2. Run in terminal:
+# python -m pip install pandas scikit-learn scipy matplotlib
+# 3. Execute:
+# python agglomerative_clustering.py
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+from sklearn.datasets import load_iris
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import AgglomerativeClustering
+from scipy.cluster.hierarchy import dendrogram, linkage
+
+# 1. Load the Iris dataset
+iris = load_iris()
+data = pd.DataFrame(iris.data, columns=iris.feature_names)
+
+# 2. Standardize the features
+X = StandardScaler().fit_transform(data)
+
+# 3. Apply Agglomerative Hierarchical Clustering
+model = AgglomerativeClustering(
+    n_clusters=3,
+    linkage="ward"
+)
+
+clusters = model.fit_predict(X)
+
+# 4. Add cluster labels to the dataset
+data["Cluster"] = clusters
+
+# 5. Display the results
+print("First 10 Records with Cluster Labels:")
+print(data.head(10).to_string(index=False))
+
+print("\nNumber of Clusters:", data["Cluster"].nunique())
+
+print("\nNumber of Records in Each Cluster:")
+print(data["Cluster"].value_counts().sort_index())
+
+# 6. Generate the linkage matrix for the dendrogram
+linked = linkage(X, method="ward")
+
+# 7. Plot the dendrogram
+plt.figure(figsize=(12, 6))
+
+dendrogram(
+    linked,
+    truncate_mode="lastp",
+    p=20,
+    show_leaf_counts=True
+)
+
+plt.title("Agglomerative Hierarchical Clustering Dendrogram")
+plt.xlabel("Data Points or Merged Clusters")
+plt.ylabel("Euclidean Distance")
+plt.tight_layout()
+plt.show()
