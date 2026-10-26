@@ -1,0 +1,88 @@
+
+# VS CODE SETUP AND EXECUTION COMMANDS:
+# 1. Keep CC GENERAL.csv in the same folder.
+# 2. Install libraries:
+#    python -m pip install pandas numpy matplotlib scikit-learn scikit-learn-extra
+# 3. Run:
+#    python kmedoids_creditcard.py
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import silhouette_score
+from sklearn_extra.cluster import KMedoids
+
+df = pd.read_csv("CC GENERAL.csv")
+df.columns = df.columns.str.strip()
+
+print("First Five Rows:")
+print(df.head())
+
+df = df.drop(columns=["CUST_ID"], errors="ignore")
+df = df.select_dtypes(include="number")
+
+imputer = SimpleImputer(strategy="median")
+X = imputer.fit_transform(df)
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+scores = []
+k_values = range(2, 7)
+
+for k in k_values:
+    model = KMedoids(
+        n_clusters=k,
+        random_state=42,
+        method="alternate"
+    )
+    labels = model.fit_predict(X_scaled)
+    score = silhouette_score(X_scaled, labels, sample_size=min(2000, len(X_scaled)), random_state=42)
+    scores.append(score)
+    print("K =", k, "Silhouette Score =", round(score, 4))
+
+plt.plot(list(k_values), scores, marker="o")
+plt.xlabel("Number of Clusters (K)")
+plt.ylabel("Silhouette Score")
+plt.title("Silhouette Method for K-Medoids")
+plt.xticks(list(k_values))
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+optimal_k = list(k_values)[int(np.argmax(scores))]
+print("\nOptimal Number of Clusters:", optimal_k)
+
+final_model = KMedoids(
+    n_clusters=optimal_k,
+    random_state=42,
+    method="alternate"
+)
+
+df["Cluster"] = final_model.fit_predict(X_scaled)
+
+print("\nCluster Counts:")
+print(df["Cluster"].value_counts().sort_index())
+
+print("\nClustered Data:")
+print(df.head())
+
+
+# LINE-BY-LINE EXPLANATION:
+# pandas: Loads and manages the credit card data.
+# numpy: Finds the index of the highest silhouette score.
+# matplotlib: Displays the silhouette graph.
+# StandardScaler: Scales numerical features to comparable ranges.
+# SimpleImputer: Replaces missing values with column medians.
+# silhouette_score: Evaluates how well separated the clusters are.
+# KMedoids: Performs clustering using representative data points.
+# drop(): Removes the customer ID column if present.
+# select_dtypes(): Keeps numerical columns for clustering.
+# fit_transform(): Imputes missing values and standardizes features.
+# k_values: Tests cluster counts from 2 to 6.
+# fit_predict(): Creates clusters and returns their labels.
+# silhouette_score(): Measures cluster cohesion and separation.
+# argmax(): Selects the cluster count with the highest score.
+# value_counts(): Counts records assigned to each cluster.

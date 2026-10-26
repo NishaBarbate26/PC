@@ -1,0 +1,116 @@
+
+# Install required library:
+# python -m pip install numpy
+#
+# Run the program:
+# python maze_rl.py
+
+import numpy as np
+import random
+
+# Define the maze: 0 = path, 1 = wall
+maze = np.array([
+    [0, 0, 0, 1, 0],
+    [1, 1, 0, 1, 0],
+    [0, 0, 0, 0, 0],
+    [0, 1, 1, 1, 0],
+    [0, 0, 0, 0, 0]
+])
+
+start = (0, 0)
+goal = (4, 4)
+
+# Actions: up, down, left, right
+actions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+q_table = np.zeros((25, 4))
+
+learning_rate = 0.8
+discount_factor = 0.9
+epsilon = 1.0
+episodes = 3000
+
+def state_index(position):
+    return position[0] * 5 + position[1]
+
+def choose_action(state):
+    if random.random() < epsilon:
+        return random.randint(0, 3)
+    return int(np.argmax(q_table[state]))
+
+# Train the agent
+for episode in range(episodes):
+    position = start
+
+    for step in range(100):
+        state = state_index(position)
+        action = choose_action(state)
+
+        dr, dc = actions[action]
+        new_position = (position[0] + dr, position[1] + dc)
+
+        # Penalize invalid moves and walls
+        if (
+            new_position[0] < 0 or new_position[0] >= 5
+            or new_position[1] < 0 or new_position[1] >= 5
+            or maze[new_position] == 1
+        ):
+            new_position = position
+            reward = -5
+        elif new_position == goal:
+            reward = 100
+        else:
+            reward = -1
+
+        next_state = state_index(new_position)
+
+        q_table[state, action] += learning_rate * (
+            reward + discount_factor * np.max(q_table[next_state])
+            - q_table[state, action]
+        )
+
+        position = new_position
+
+        if position == goal:
+            break
+
+    epsilon = max(0.01, epsilon * 0.995)
+
+# Test the trained agent
+epsilon = 0
+position = start
+path = [position]
+
+for step in range(100):
+    state = state_index(position)
+    action = int(np.argmax(q_table[state]))
+    dr, dc = actions[action]
+    new_position = (position[0] + dr, position[1] + dc)
+
+    if (
+        new_position[0] < 0 or new_position[0] >= 5
+        or new_position[1] < 0 or new_position[1] >= 5
+        or maze[new_position] == 1
+    ):
+        print("Agent selected an invalid move.")
+        break
+
+    position = new_position
+    path.append(position)
+
+    if position == goal:
+        print("Goal reached!")
+        break
+else:
+    print("Goal not reached within the step limit.")
+
+print("Learned path:", path)
+print("\nMaze (0 = path, 1 = wall):")
+print(maze)
+
+# Explanation:
+# 1. Define the maze, starting position, and goal.
+# 2. Create a Q-table to store action values for each state.
+# 3. Train the agent using exploration and Q-learning updates.
+# 4. Give rewards for reaching the goal and penalties for bad moves.
+# 5. Test the learned policy and print the path taken through the maze.

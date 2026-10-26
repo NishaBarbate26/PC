@@ -1,0 +1,258 @@
+
+# ============================================================
+# DMV Practical: Data Cleaning and Preparation
+# VS CODE TERMINAL COMMANDS:
+# python -m pip install pandas numpy scikit-learn
+# python customer_churn_cleaning.py
+# Keep Telecom_Customer_Churn.csv in the same folder.
+# ============================================================
+
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+# Step 1: Load the dataset
+FILE_NAME = "Telecom_Customer_Churn.csv"
+df = pd.read_csv(FILE_NAME)
+
+print("\n--- ORIGINAL DATASET ---")
+print(df.head())
+print("\nDataset shape:", df.shape)
+print("\nColumn names:\n", df.columns.tolist())
+print("\nData types:\n", df.dtypes)
+print("\nMissing values:\n", df.isnull().sum())
+print("\nDuplicate records:", df.duplicated().sum())
+print("\nStatistical summary:\n", df.describe(include="all").T)
+
+# Step 2: Standardize column names and text values
+df.columns = df.columns.str.strip()
+df.columns = df.columns.str.replace(" ", "_")
+
+for col in df.select_dtypes(include=["object", "string"]).columns:
+    df[col] = df[col].apply(
+        lambda x: x.strip() if isinstance(x, str) else x
+    )
+
+# Remove duplicate records
+df = df.drop_duplicates()
+
+# Remove duplicate customer IDs, if available
+id_col = next(
+    (c for c in df.columns if c.lower() in
+     ["customerid", "customer_id"]),
+    None
+)
+
+if id_col:
+    df = df.drop_duplicates(subset=id_col, keep="first")
+
+# Step 3: Convert common numeric columns to numeric types
+for col in df.columns:
+    if col.lower() in [
+        "tenure", "monthlycharges", "totalcharges",
+        "seniorcitizen", "numdevices"
+    ]:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+# Identify the churn target column
+target_col = next(
+    (c for c in df.columns if c.lower() == "churn"),
+    None
+)
+
+if target_col is None:
+    raise ValueError("Dataset must contain a Churn column.")
+
+# Remove records with missing target values
+df = df.dropna(subset=[target_col])
+
+# Standardize categorical values
+for col in df.select_dtypes(include=["object", "string"]).columns:
+    df[col] = df[col].apply(
+        lambda x: x.title() if isinstance(x, str) else x
+    )
+
+# Standardize common Yes/No target labels
+df[target_col] = df[target_col].replace({
+    "Y": "Yes", "N": "No",
+    "1": "Yes", "0": "No"
+})
+
+# Step 4: Handle missing values
+numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
+categorical_cols = df.select_dtypes(
+    include=["object", "string"]
+).columns.tolist()
+
+for col in numeric_cols:
+    df[col] = df[col].fillna(df[col].median())
+
+for col in categorical_cols:
+    if df[col].isnull().any():
+        mode_values = df[col].mode()
+        replacement = mode_values.iloc[0] if not mode_values.empty else "Unknown"
+        df[col] = df[col].fillna(replacement)
+
+# Step 5: Identify and handle outliers using the IQR method
+outlier_cols = [
+    c for c in numeric_cols
+    if c.lower() not in ["seniorcitizen"]
+]
+
+for col in outlier_cols:
+    q1 = df[col].quantile(0.25)
+    q3 = df[col].quantile(0.75)
+    iqr = q3 - q1
+    lower = q1 - 1.5 * iqr
+    upper = q3 + 1.5 * iqr
+
+    outliers = ((df[col] < lower) | (df[col] > upper)).sum()
+    if outliers > 0:
+        print(f"Outliers in {col}: {outliers}")
+
+    df[col] = df[col].clip(lower=lower, upper=upper)
+
+# Step 6: Feature engineering
+tenure_col = next(
+    (c for c in df.columns if c.lower() == "tenure"),
+    None
+)
+
+monthly_col = next(
+    (c for c in df.columns if c.lower() == "monthlycharges"),
+    None
+)
+
+total_col = next(
+    (c for c in df.columns if c.lower() == "totalcharges"),
+    None
+)
+
+if tenure_col:
+    df["TenureGroup"] = pd.cut(
+        df[tenure_col],
+        bins=[-1, 12, 24, 48, np.inf],
+        labels=["New", "Short-term", "Medium-term", "Long-term"]
+    ).astype("object")
+
+if total_col and tenure_col:
+    df["AverageMonthlySpend"] = (
+        df[total_col] / df[tenure_col].replace(0, np.nan)
+    )
+    df["AverageMonthlySpend"] = df["AverageMonthlySpend"].fillna(0)
+
+# Save cleaned data before scaling
+df.to_csv("cleaned_customer_churn.csv", index=False)
+
+print("\n--- CLEANED DATASET ---")
+print(df.head())
+print("\nCleaned dataset shape:", df.shape)
+print("\nMissing values after cleaning:\n", df.isnull().sum())
+
+# Step 7: Prepare features and target
+y = df[target_col].copy()
+
+# Convert common churn labels into 0 and 1
+if y.dtype == "object":
+    y = y.astype(str).str.strip().str.title()
+    y = y.map({
+        "No": 0, "Yes": 1,
+        "False": 0, "True": 1
+    }).fillna(y)
+
+# Exclude customer IDs from model features
+X = df.drop(columns=[target_col])
+if id_col and id_col in X.columns:
+    X = X.drop(columns=[id_col])
+
+# Step 8: Split into training and testing datasets
+stratify_value = y if y.nunique() == 2 and y.value_counts().min() >= 2 else None
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y,
+    test_size=0.2,
+    random_state=42,
+    stratify=stratify_value
+)
+
+print("\nTraining records:", len(X_train))
+print("Testing records:", len(X_test))
+
+# Step 9: Scale numerical features without data leakage
+scale_cols = X_train.select_dtypes(include=np.number).columns.tolist()
+
+scaler = StandardScaler()
+
+if scale_cols:
+    X_train.loc[:, scale_cols] = scaler.fit_transform(
+        X_train[scale_cols]
+    )
+    X_test.loc[:, scale_cols] = scaler.transform(
+        X_test[scale_cols]
+    )
+
+# Step 10: Export training and testing datasets
+train_data = X_train.copy()
+train_data[target_col] = y_train
+
+test_data = X_test.copy()
+test_data[target_col] = y_test
+
+train_data.to_csv("churn_train.csv", index=False)
+test_data.to_csv("churn_test.csv", index=False)
+
+print("\n--- FINAL RESULTS ---")
+print("Cleaned data saved: cleaned_customer_churn.csv")
+print("Training data saved: churn_train.csv")
+print("Testing data saved: churn_test.csv")
+print("Numerical features scaled:", scale_cols)
+print("\nData cleaning and preparation completed successfully!")
+
+# ============================================================
+# LINE-BY-LINE EXPLANATION
+# ============================================================
+# Lines 1-6: Display setup commands and the practical title.
+# Line 8: Imports pandas for data handling.
+# Line 9: Imports numpy for numerical calculations.
+# Line 10: Imports the function for splitting the dataset.
+# Line 11: Imports StandardScaler for numerical feature scaling.
+# Lines 14-15: Read the CSV file into a DataFrame.
+# Lines 17-24: Display records, shape, columns, types, missing
+#              values, duplicates and statistical information.
+# Lines 27-29: Remove spaces around column names and replace
+#              spaces inside names with underscores.
+# Lines 31-34: Remove extra spaces from text values.
+# Line 37: Remove completely duplicated rows.
+# Lines 40-44: Find the customer ID column if it exists.
+# Lines 46-47: Keep only the first record for each customer ID.
+# Lines 50-56: Convert known numerical columns into numeric types.
+# Lines 59-63: Find the Churn target column or stop with an error.
+# Line 66: Remove rows whose churn target is missing.
+# Lines 69-72: Standardize text capitalization and formatting.
+# Lines 75-79: Standardize common churn labels to Yes and No.
+# Lines 82-84: Identify numerical and categorical columns.
+# Lines 86-88: Fill missing numerical values with column medians.
+# Lines 90-94: Fill missing categorical values with their mode.
+# Lines 97-101: Select numerical columns for outlier detection.
+# Lines 103-109: Calculate quartiles and IQR-based outlier limits.
+# Lines 111-113: Display the number of outliers in each column.
+# Line 115: Cap extreme values at the calculated IQR boundaries.
+# Lines 118-131: Find tenure and charge columns by their names.
+# Lines 133-139: Create customer tenure groups.
+# Lines 141-145: Calculate average monthly spending per customer.
+# Lines 148-149: Save the cleaned dataset before scaling.
+# Lines 151-155: Display cleaned records and remaining missing values.
+# Lines 158-159: Separate the churn target from the other columns.
+# Lines 162-168: Encode common Yes/No churn labels as 0 and 1.
+# Lines 171-173: Remove the target and customer ID from predictors.
+# Lines 176-184: Split the dataset into 80% training and 20% testing.
+# Line 176: Stratification preserves class proportions when possible.
+# Lines 186-187: Display the training and testing record counts.
+# Lines 190-191: Select numerical feature columns for scaling.
+# Line 193: Create a StandardScaler object.
+# Lines 195-198: Fit the scaler on training data and transform it.
+# Lines 199-200: Transform test data using the training scaler.
+# Lines 203-208: Combine features with their churn labels and export.
+# Lines 210-213: Display the output filenames and completion message.
+# ============================================================

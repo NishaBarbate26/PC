@@ -1,0 +1,97 @@
+
+# VS CODE SETUP AND EXECUTION COMMANDS:
+# 1. Keep car.data in the same folder.
+# 2. Install libraries:
+#    python -m pip install pandas scikit-learn
+# 3. Run:
+#    python random_forest_car.py
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+
+columns = [
+    "buying", "maint", "doors", "persons",
+    "lug_boot", "safety", "class"
+]
+
+df = pd.read_csv("car.data", header=None, names=columns)
+
+print("First Five Rows:")
+print(df.head())
+
+X = df.drop(columns=["class"])
+y = df["class"]
+
+encoders = {}
+
+for col in X.columns:
+    encoders[col] = LabelEncoder()
+    X[col] = encoders[col].fit_transform(X[col].astype(str))
+
+target_encoder = LabelEncoder()
+y = target_encoder.fit_transform(y)
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+model = RandomForestClassifier(
+    n_estimators=100, random_state=42
+)
+
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+
+print("\nAccuracy:", round(accuracy_score(y_test, y_pred) * 100, 2), "%")
+
+print("\nConfusion Matrix:")
+print(confusion_matrix(y_test, y_pred))
+
+print("\nClassification Report:")
+print(classification_report(
+    y_test, y_pred,
+    labels=range(len(target_encoder.classes_)),
+    target_names=target_encoder.classes_,
+    zero_division=0
+))
+
+print("\nFeature Importance:")
+print(pd.Series(
+    model.feature_importances_, index=X.columns
+).sort_values(ascending=False))
+
+sample_car = pd.DataFrame([{
+    "buying": encoders["buying"].transform(["vhigh"])[0],
+    "maint": encoders["maint"].transform(["high"])[0],
+    "doors": encoders["doors"].transform(["4"])[0],
+    "persons": encoders["persons"].transform(["4"])[0],
+    "lug_boot": encoders["lug_boot"].transform(["big"])[0],
+    "safety": encoders["safety"].transform(["high"])[0]
+}])
+
+prediction = model.predict(sample_car)
+print("\nPredicted Car Safety Class:", target_encoder.inverse_transform(prediction)[0])
+
+
+# LINE-BY-LINE EXPLANATION:
+# pandas: Loads and manages the dataset.
+# train_test_split: Separates training and testing data.
+# RandomForestClassifier: Builds a collection of decision trees.
+# LabelEncoder: Converts categorical values into numerical labels.
+# accuracy_score: Calculates classification accuracy.
+# confusion_matrix: Shows correct and incorrect predictions.
+# classification_report: Displays precision, recall, and F1-score.
+# columns: Names the seven columns in the dataset.
+# X: Contains car characteristics.
+# y: Contains the car evaluation class.
+# fit_transform(): Learns category mappings and converts categories.
+# stratify=y: Preserves class proportions in the split.
+# n_estimators=100: Creates 100 decision trees.
+# fit(): Trains the Random Forest model.
+# predict(): Predicts car evaluation classes.
+# feature_importances_: Estimates the relative importance of each feature.
+# sample_car: Represents an example car configuration.
+# inverse_transform(): Converts the predicted label into its original class.

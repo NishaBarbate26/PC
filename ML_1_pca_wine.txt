@@ -1,0 +1,82 @@
+
+# VS CODE SETUP AND EXECUTION COMMANDS:
+# 1. Save the dataset as Wine.csv in the same folder.
+# 2. Install libraries:
+#    python -m pip install pandas matplotlib scikit-learn
+# 3. Run:
+#    python pca_wine.py
+
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+
+df = pd.read_csv("Wine.csv")
+
+print("First five rows:")
+print(df.head())
+
+target_candidates = ["Customer_Segment", "target", "class", "label"]
+target_column = next(
+    (col for col in df.columns if col.lower() in [x.lower() for x in target_candidates]),
+    df.columns[-1]
+)
+
+y = df[target_column]
+X = df.drop(columns=[target_column])
+X = X.select_dtypes(include="number")
+
+X_scaled = StandardScaler().fit_transform(X)
+
+pca = PCA(n_components=2)
+X_pca = pca.fit_transform(X_scaled)
+
+result = pd.DataFrame(
+    X_pca,
+    columns=["Principal Component 1", "Principal Component 2"]
+)
+result["Class"] = y.astype(str).values
+
+print("\nTransformed Data:")
+print(result.head())
+
+print("\nExplained Variance Ratio:")
+print(pca.explained_variance_ratio_)
+
+print(
+    "\nTotal Variance Captured:",
+    round(pca.explained_variance_ratio_.sum() * 100, 2), "%"
+)
+
+for label in result["Class"].unique():
+    subset = result[result["Class"] == label]
+    plt.scatter(
+        subset["Principal Component 1"],
+        subset["Principal Component 2"],
+        label=label
+    )
+
+plt.xlabel("Principal Component 1")
+plt.ylabel("Principal Component 2")
+plt.title("PCA on Wine Dataset")
+plt.legend(title="Wine Class")
+plt.tight_layout()
+plt.savefig("pca_wine.png")
+plt.show()
+
+
+# LINE-BY-LINE EXPLANATION:
+# pandas: Loads and manages the CSV dataset.
+# matplotlib: Displays the PCA scatter plot.
+# StandardScaler: Standardizes features to a common scale.
+# PCA: Reduces the number of features.
+# read_csv(): Reads Wine.csv from the current folder.
+# head(): Displays the first five records.
+# target_column: Finds the class column, or assumes the last column is the label.
+# y: Stores class labels for plotting.
+# X: Stores the numerical measurement features.
+# fit_transform(): Learns scaling/PCA parameters and transforms the data.
+# n_components=2: Reduces the features to two principal components.
+# explained_variance_ratio_: Shows variance captured by each component.
+# scatter(): Plots samples in two-dimensional PCA space.
+# savefig(): Saves the graph as pca_wine.png.

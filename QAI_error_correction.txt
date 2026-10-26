@@ -1,0 +1,67 @@
+
+# Practical: Tackle Noise with Error Correction
+
+# VS CODE SETUP AND EXECUTION COMMANDS:
+# 1. Install Python 3.10 or later.
+# 2. Open the terminal in VS Code.
+# 3. Install Qiskit:
+#    python -m pip install qiskit
+# 4. Save this file as error_correction.py
+# 5. Run:
+#    python error_correction.py
+
+from qiskit import QuantumCircuit
+from qiskit.primitives import StatevectorSampler
+
+# Create 3 data qubits, 2 syndrome qubits, and 5 classical bits.
+qc = QuantumCircuit(5, 5)
+
+# Step 1: Encode logical state |1> as |111>.
+qc.x(0)
+qc.cx(0, 1)
+qc.cx(0, 2)
+
+# Step 2: Introduce a bit-flip error on data qubit 1.
+qc.x(1)
+
+# Step 3: Calculate the error syndrome using parity checks.
+# Syndrome qubit 3 stores q0 XOR q1.
+qc.cx(0, 3)
+qc.cx(1, 3)
+
+# Syndrome qubit 4 stores q1 XOR q2.
+qc.cx(1, 4)
+qc.cx(2, 4)
+
+# Step 4: Correct an error on data qubit 0.
+# Syndrome (q3, q4) = (1, 0).
+qc.x(4)
+qc.ccx(3, 4, 0)
+qc.x(4)
+
+# Step 5: Correct an error on data qubit 1.
+# Syndrome (q3, q4) = (1, 1).
+qc.ccx(3, 4, 1)
+
+# Step 6: Correct an error on data qubit 2.
+# Syndrome (q3, q4) = (0, 1).
+qc.x(3)
+qc.ccx(3, 4, 2)
+qc.x(3)
+
+# Step 7: Measure all data and syndrome qubits.
+qc.measure(range(5), range(5))
+
+# Step 8: Simulate the circuit.
+sampler = StatevectorSampler()
+job = sampler.run([qc], shots=100)
+result = job.result()
+counts = result[0].data.c.get_counts()
+
+# Step 9: Display the results.
+print("Quantum Error Correction using the Bit-Flip Code")
+print("Measurement Results:", counts)
+print("Expected Corrected Data Qubits: 111")
+print("Expected Error Syndrome: 11")
+print("\nQuantum Circuit:")
+print(qc.draw(output="text"))

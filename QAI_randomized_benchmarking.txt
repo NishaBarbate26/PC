@@ -1,0 +1,87 @@
+
+# VS CODE SETUP AND EXECUTION COMMANDS:
+# 1. Install Python 3.10 or later.
+# 2. Install required libraries:
+#    python -m pip install qiskit qiskit-aer qiskit-experiments matplotlib
+# 3. Run the program:
+#    python randomized_benchmarking.py
+
+from qiskit_aer import AerSimulator
+from qiskit_aer.noise import NoiseModel, depolarizing_error
+from qiskit_experiments.library import StandardRB
+
+noise_model = NoiseModel()
+noise_model.add_all_qubit_quantum_error(
+    depolarizing_error(0.005, 1), ["sx", "x"]
+)
+noise_model.add_all_qubit_quantum_error(
+    depolarizing_error(0.02, 2), ["cx"]
+)
+
+backend = AerSimulator(noise_model=noise_model)
+
+lengths = [1, 2, 4, 8, 16]
+num_samples = 5
+shots = 200
+
+experiment = StandardRB(
+    physical_qubits=(0,),
+    lengths=lengths,
+    num_samples=num_samples,
+    seed=42
+)
+
+experiment.set_run_options(shots=shots)
+
+experiment_data = experiment.run(backend).block_for_results()
+
+print("Randomized Benchmarking Protocol")
+print("Sequence lengths:", lengths)
+print("Samples per length:", num_samples)
+print("Shots per circuit:", shots)
+
+results = experiment_data.analysis_results(dataframe=True)
+print("\nRandomized Benchmarking Results:")
+print(results.to_string(index=False))
+
+print("\nError Per Clifford (EPC):")
+for result in experiment_data.analysis_results():
+    if result.name == "EPC":
+        print(result.value)
+        break
+
+figure = experiment_data.figure(0)
+figure.savefig("rb_results.png")
+figure.show()
+
+print("\nGraph saved as rb_results.png")
+
+
+# LINE-BY-LINE EXPLANATION:
+# AerSimulator: Imports the local quantum circuit simulator.
+# NoiseModel: Creates a model of quantum gate errors.
+# depolarizing_error: Creates a depolarizing noise channel.
+# StandardRB: Imports the standard Randomized Benchmarking experiment.
+# NoiseModel(): Creates an initially empty noise model.
+# depolarizing_error(0.005, 1): Defines 0.5% single-qubit depolarizing noise.
+# ["sx", "x"]: Applies the single-qubit noise model to these gates.
+# depolarizing_error(0.02, 2): Defines 2% two-qubit depolarizing noise.
+# ["cx"]: Applies the two-qubit noise model to controlled-NOT gates.
+# AerSimulator(noise_model=...): Creates a simulator with the specified noise.
+# lengths: Defines the Clifford sequence lengths to test.
+# num_samples: Sets the number of random circuits per sequence length.
+# shots: Sets the number of measurements per circuit.
+# StandardRB(): Creates a single-qubit randomized benchmarking experiment.
+# physical_qubits=(0,): Selects simulator qubit zero.
+# seed=42: Makes random sequence generation reproducible.
+# set_run_options(): Sets the number of measurement shots.
+# experiment.run(): Executes the experiment on the noisy simulator.
+# block_for_results(): Waits for results and analysis to finish.
+# analysis_results(dataframe=True): Retrieves the analysis results as a table.
+# to_string(index=False): Prints the table without row indices.
+# analysis_results(): Retrieves individual analysis results.
+# result.name == "EPC": Searches for the Error Per Clifford result.
+# result.value: Displays the estimated error per Clifford.
+# experiment_data.figure(0): Retrieves the randomized benchmarking plot.
+# savefig(): Saves the plot as rb_results.png.
+# figure.show(): Opens the plot for viewing.

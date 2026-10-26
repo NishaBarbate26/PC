@@ -1,0 +1,54 @@
+
+# VS CODE SETUP AND EXECUTION COMMANDS:
+# 1. Install Python 3.10 or later.
+# 2. Install Qiskit:
+#    python -m pip install qiskit
+# 3. Run the program:
+#    python random_16_qubit.py
+
+from qiskit import QuantumCircuit
+from qiskit.primitives import StatevectorSampler
+
+n = 16
+shots = 1
+
+qc = QuantumCircuit(n)
+
+for qubit in range(n):
+    qc.h(qubit)
+
+qc.measure_all()
+
+sampler = StatevectorSampler()
+job = sampler.run([qc], shots=shots)
+result = job.result()
+
+counts = result[0].data.meas.get_counts()
+random_number = list(counts.keys())[0].replace(" ", "")
+
+print("16-Qubit Quantum Random Number Generator")
+print("Number of Qubits:", n)
+print("Random 16-bit Number:", random_number)
+print("Decimal Equivalent:", int(random_number, 2))
+print("\nQuantum Circuit:")
+print(qc.draw(output="text"))
+
+
+# LINE-BY-LINE EXPLANATION:
+# from qiskit import QuantumCircuit: Imports the quantum circuit class.
+# StatevectorSampler: Simulates quantum measurements using a statevector.
+# n = 16: Sets the number of qubits to 16.
+# shots = 1: Requests one measurement result.
+# QuantumCircuit(n): Creates a circuit containing 16 qubits.
+# for qubit in range(n): Visits each qubit from 0 to 15.
+# qc.h(qubit): Applies a Hadamard gate to create superposition.
+# qc.measure_all(): Measures all 16 qubits.
+# StatevectorSampler(): Creates the local quantum circuit simulator.
+# sampler.run(): Executes the circuit for one shot.
+# job.result(): Retrieves the simulation results.
+# get_counts(): Gets the measured bitstring and its count.
+# list(counts.keys())[0]: Retrieves the measured 16-bit result.
+# replace(" ", ""): Removes spaces from the bitstring if present.
+# int(random_number, 2): Converts the binary number to decimal.
+# print(): Displays the number of qubits and generated result.
+# qc.draw(): Displays the quantum circuit in text format.

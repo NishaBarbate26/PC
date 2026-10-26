@@ -1,0 +1,223 @@
+
+# ============================================================
+# DMV Practical: Interacting with Web APIs
+# VS CODE TERMINAL COMMANDS:
+# python -m pip install requests pandas numpy matplotlib seaborn
+# python weather_analysis.py
+# ============================================================
+
+import requests
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from getpass import getpass
+
+# Step 1: Enter API key and city
+API_KEY = getpass("Enter your OpenWeatherMap API key: ")
+CITY = input("Enter city name (default Pune): ").strip() or "Pune"
+
+# Step 2: Fetch 5-day weather forecast (3-hour intervals)
+url = "https://api.openweathermap.org/data/2.5/forecast"
+params = {"q": CITY, "appid": API_KEY, "units": "metric"}
+
+try:
+    response = requests.get(url, params=params, timeout=20)
+    response.raise_for_status()
+    data = response.json()
+
+except requests.exceptions.HTTPError:
+    print("API error:", response.status_code, response.text)
+    raise SystemExit("Check your API key, city name, or API access.")
+
+except requests.exceptions.RequestException as error:
+    raise SystemExit(f"Network error: {error}")
+
+# Step 3: Extract relevant weather attributes
+records = []
+
+for item in data["list"]:
+    records.append({
+        "Date": item.get("dt_txt"),
+        "Temperature": item.get("main", {}).get("temp"),
+        "Humidity": item.get("main", {}).get("humidity"),
+        "WindSpeed": item.get("wind", {}).get("speed"),
+        "Precipitation": item.get("rain", {}).get("3h", 0),
+        "RainProbability": item.get("pop", 0) * 100,
+        "Pressure": item.get("main", {}).get("pressure")
+    })
+
+df = pd.DataFrame(records)
+
+# Step 4: Clean and preprocess the data
+df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+
+numeric_cols = [
+    "Temperature", "Humidity", "WindSpeed",
+    "Precipitation", "RainProbability", "Pressure"
+]
+
+df[numeric_cols] = df[numeric_cols].apply(
+    pd.to_numeric, errors="coerce"
+)
+
+df = df.dropna(subset=["Date"])
+df = df.drop_duplicates(subset=["Date"])
+df[numeric_cols] = df[numeric_cols].fillna(
+    df[numeric_cols].median()
+)
+
+# Step 5: Add date-based columns and save data
+df["Day"] = df["Date"].dt.strftime("%Y-%m-%d")
+df["Month"] = df["Date"].dt.strftime("%B")
+df["Season"] = df["Date"].dt.month.map({
+    12: "Winter", 1: "Winter", 2: "Winter",
+    3: "Summer", 4: "Summer", 5: "Summer",
+    6: "Monsoon", 7: "Monsoon", 8: "Monsoon",
+    9: "Monsoon", 10: "Post-Monsoon", 11: "Post-Monsoon"
+})
+
+df.to_csv("weather_data.csv", index=False)
+
+print("\n--- WEATHER DATA ---")
+print(df.head(10).to_string(index=False))
+print("\nDataset shape:", df.shape)
+print("\nMissing values:\n", df.isnull().sum())
+
+# Step 6: Calculate weather statistics
+print("\n--- DESCRIPTIVE STATISTICS ---")
+print(df[numeric_cols].describe().round(2))
+
+print("\nAverage temperature:", round(df["Temperature"].mean(), 2), "°C")
+print("Maximum temperature:", round(df["Temperature"].max(), 2), "°C")
+print("Minimum temperature:", round(df["Temperature"].min(), 2), "°C")
+print("Average humidity:", round(df["Humidity"].mean(), 2), "%")
+print("Maximum wind speed:", round(df["WindSpeed"].max(), 2), "m/s")
+print("Total forecast precipitation:", round(df["Precipitation"].sum(), 2), "mm")
+
+# Step 7: Aggregate data by day, month and season
+daily = df.groupby("Day").agg(
+    AvgTemperature=("Temperature", "mean"),
+    MaxTemperature=("Temperature", "max"),
+    MinTemperature=("Temperature", "min"),
+    AvgHumidity=("Humidity", "mean"),
+    AvgWindSpeed=("WindSpeed", "mean"),
+    TotalPrecipitation=("Precipitation", "sum")
+).round(2)
+
+print("\n--- DAILY WEATHER SUMMARY ---")
+print(daily)
+
+print("\n--- MONTHLY WEATHER SUMMARY ---")
+print(df.groupby("Month")[numeric_cols].mean().round(2))
+
+print("\n--- SEASONAL WEATHER SUMMARY ---")
+print(df.groupby("Season")[numeric_cols].mean().round(2))
+
+# Step 8: Visualize temperature changes over time
+sns.set_theme(style="whitegrid")
+
+plt.figure(figsize=(10, 5))
+plt.plot(df["Date"], df["Temperature"], marker="o")
+plt.title(f"Temperature Forecast - {CITY}")
+plt.xlabel("Date and Time")
+plt.ylabel("Temperature (°C)")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+# Step 9: Plot daily precipitation
+plt.figure(figsize=(9, 5))
+plt.bar(daily.index, daily["TotalPrecipitation"])
+plt.title(f"Daily Precipitation - {CITY}")
+plt.xlabel("Day")
+plt.ylabel("Precipitation (mm)")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+# Step 10: Plot wind speed variations
+plt.figure(figsize=(10, 5))
+plt.plot(df["Date"], df["WindSpeed"], marker="o")
+plt.title(f"Wind Speed Forecast - {CITY}")
+plt.xlabel("Date and Time")
+plt.ylabel("Wind Speed (m/s)")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+# Step 11: Analyze relationships using a correlation heatmap
+plt.figure(figsize=(8, 6))
+sns.heatmap(
+    df[numeric_cols].corr(),
+    annot=True,
+    cmap="coolwarm",
+    fmt=".2f"
+)
+plt.title("Weather Attribute Correlation Heatmap")
+plt.tight_layout()
+plt.show()
+
+# Step 12: Display geographical coordinates on a map-like plot
+latitude = data["city"]["coord"]["lat"]
+longitude = data["city"]["coord"]["lon"]
+
+plt.figure(figsize=(7, 5))
+plt.scatter(longitude, latitude, s=200, marker="o")
+plt.annotate(CITY, (longitude, latitude), xytext=(5, 5),
+             textcoords="offset points")
+plt.title("Geographical Location of Weather Data")
+plt.xlabel("Longitude")
+plt.ylabel("Latitude")
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+print("\nWeather analysis completed successfully!")
+print("Cleaned data saved to weather_data.csv")
+
+# ============================================================
+# LINE-BY-LINE EXPLANATION
+# ============================================================
+# Lines 1-6: Show the practical title and installation commands.
+# Line 8: Imports requests to communicate with the weather API.
+# Line 9: Imports pandas to store and analyze tabular data.
+# Line 10: Imports numpy for numerical operations.
+# Line 11: Imports matplotlib for plotting graphs.
+# Line 12: Imports seaborn for statistical visualization.
+# Line 13: Imports getpass to hide the API key while typing.
+# Lines 16-17: Read the API key and city from the user.
+# Line 20: Stores the official five-day forecast API endpoint.
+# Line 21: Prepares the city, API key and Celsius unit parameters.
+# Lines 23-24: Send an HTTP request and check for errors.
+# Line 25: Convert the API response into a Python dictionary.
+# Lines 27-29: Handle API errors, including invalid API keys.
+# Lines 31-32: Handle network errors and stop safely.
+# Line 35: Create an empty list for extracted weather records.
+# Line 37: Process each three-hour forecast record.
+# Lines 38-46: Extract time, temperature, humidity, wind,
+#              precipitation, rain probability and pressure.
+# Line 48: Convert the extracted records into a DataFrame.
+# Line 51: Convert forecast timestamps into datetime values.
+# Lines 53-56: List all numerical weather attributes.
+# Lines 58-60: Convert the selected columns into numeric values.
+# Line 62: Remove records with invalid timestamps.
+# Line 63: Remove records having duplicate timestamps.
+# Lines 64-66: Replace missing numeric values with column medians.
+# Lines 69-70: Extract the date and month from each timestamp.
+# Lines 71-76: Assign an approximate season based on month.
+# Line 78: Save the cleaned weather dataset as CSV.
+# Lines 80-83: Display sample records, shape and missing values.
+# Lines 86-87: Calculate descriptive statistical measures.
+# Lines 89-94: Display average, maximum and minimum weather values.
+# Lines 97-103: Group observations by day and calculate summaries.
+# Lines 105-107: Calculate monthly average weather statistics.
+# Lines 109-111: Calculate seasonal average weather statistics.
+# Lines 116-124: Plot temperature changes over time.
+# Lines 127-134: Plot total daily precipitation using a bar chart.
+# Lines 137-144: Plot forecast wind speed over time.
+# Lines 147-154: Calculate correlations and display a heatmap.
+# Lines 157-158: Read the city's latitude and longitude.
+# Lines 160-170: Plot and label the geographical coordinates.
+# Lines 172-173: Print the completion message and output filename.
+# ============================================================

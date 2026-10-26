@@ -1,0 +1,200 @@
+
+# ============================================================
+# DMV Practical: Data Loading, Storage and File Formats
+# VS CODE SETUP COMMANDS (run in Terminal):
+# python -m pip install pandas numpy matplotlib seaborn openpyxl
+# python sales_analysis.py
+# ============================================================
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Step 1: Create sample sales datasets in CSV, Excel and JSON formats
+
+csv_data = pd.DataFrame([
+    [101, "2026-01-05", "Amit", "Laptop", "Electronics", 2, 50000, "Pune"],
+    [102, "2026-01-10", "Neha", "Chair", "Furniture", 4, 2500, "Mumbai"],
+    [103, "2026-02-12", "Raj", "Phone", "electronics", 1, 20000, "Pune"],
+    [104, "2026-02-15", "Sara", "Table", "Furniture", np.nan, 6000, "Delhi"],
+    [105, "2026-03-02", "Ravi", "Watch", "Accessories", 3, 1500, "Mumbai"]
+], columns=["OrderID", "Date", "Customer", "Product", "Category",
+            "Quantity", "UnitPrice", "Region"])
+
+excel_data = pd.DataFrame([
+    [103, "2026-02-12", "Raj", "Phone", "Electronics", 1, 20000, "Pune"],
+    [106, "2026-03-08", "Priya", "Laptop", "Electronics", 1, 55000, "Delhi"],
+    [107, "2026-03-12", "Aman", "Sofa", "Furniture", 2, 15000, "Pune"],
+    [108, "2026-04-01", "Isha", "Headphones", "Accessories", 5, 1000, "Mumbai"],
+    [109, "2026-04-05", "Kiran", "Phone", "Electronics", 2, np.nan, "Delhi"]
+], columns=csv_data.columns)
+
+json_data = pd.DataFrame([
+    [110, "2026-04-10", "Meera", "Desk", "Furniture", 2, 8000, "Pune"],
+    [111, "2026-04-15", "Arjun", "Watch", "Accessories", 4, 2000, "Mumbai"],
+    [112, "2026-05-02", "Riya", "Laptop", "Electronics", 1, 60000, "Delhi"],
+    [113, "2026-05-10", "Dev", "Chair", "Furniture", 3, 3000, "Pune"],
+    [114, "2026-05-15", "Anaya", "Phone", "Electronics", 2, 18000, "Mumbai"]
+], columns=csv_data.columns)
+
+# Save the datasets in their respective file formats
+csv_data.to_csv("sales.csv", index=False)
+excel_data.to_excel("sales.xlsx", index=False)
+json_data.to_json("sales.json", orient="records", indent=4)
+
+# Step 2: Load data from all three file formats
+df_csv = pd.read_csv("sales.csv")
+df_excel = pd.read_excel("sales.xlsx")
+df_json = pd.read_json("sales.json")
+
+print("\n--- CSV DATA ---")
+print(df_csv.head())
+print("\n--- EXCEL DATA ---")
+print(df_excel.head())
+print("\n--- JSON DATA ---")
+print(df_json.head())
+
+# Step 3: Explore data and identify missing values and duplicates
+print("\nCSV information:")
+df_csv.info()
+print("\nMissing values in each file:")
+print("CSV:\n", df_csv.isnull().sum())
+print("Excel:\n", df_excel.isnull().sum())
+print("JSON:\n", df_json.isnull().sum())
+
+# Step 4: Combine all datasets into one DataFrame
+df = pd.concat([df_csv, df_excel, df_json], ignore_index=True)
+
+print("\nCombined dataset shape:", df.shape)
+print("\nDuplicate rows:", df.duplicated().sum())
+print("Duplicate Order IDs:", df["OrderID"].duplicated().sum())
+
+# Step 5: Clean and transform the data
+df = df.drop_duplicates(subset="OrderID", keep="first")
+df["Category"] = df["Category"].str.strip().str.title()
+df["Region"] = df["Region"].str.strip().str.title()
+df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+df["Quantity"] = df["Quantity"].fillna(df["Quantity"].median())
+df["UnitPrice"] = df["UnitPrice"].fillna(df["UnitPrice"].median())
+df = df.dropna(subset=["Date", "OrderID", "Product", "Category"])
+df["TotalSales"] = df["Quantity"] * df["UnitPrice"]
+df["Month"] = df["Date"].dt.strftime("%B")
+
+# Save the cleaned unified dataset
+df.to_csv("cleaned_sales.csv", index=False)
+
+print("\n--- CLEANED DATA ---")
+print(df.to_string(index=False))
+print("\nMissing values after cleaning:\n", df.isnull().sum())
+print("\nCleaned dataset saved as cleaned_sales.csv")
+
+# Step 6: Perform descriptive and sales analysis
+print("\n--- DESCRIPTIVE STATISTICS ---")
+print(df[["Quantity", "UnitPrice", "TotalSales"]].describe())
+
+print("\nTotal Sales:", round(df["TotalSales"].sum(), 2))
+print("Average Order Value:", round(df["TotalSales"].mean(), 2))
+print("Total Orders:", df["OrderID"].nunique())
+
+print("\n--- SALES BY CATEGORY ---")
+print(df.groupby("Category")["TotalSales"].sum().sort_values(ascending=False))
+
+print("\n--- SALES BY REGION ---")
+print(df.groupby("Region")["TotalSales"].sum())
+
+print("\n--- PRODUCT CATEGORY DISTRIBUTION ---")
+print(df["Category"].value_counts())
+
+print("\n--- MONTHLY SALES ---")
+print(df.groupby("Month")["TotalSales"].sum())
+
+# Step 7: Visualize the sales data
+sns.set_theme(style="whitegrid")
+
+# Bar plot: Total sales by category
+plt.figure(figsize=(8, 5))
+sns.barplot(data=df, x="Category", y="TotalSales", estimator=sum, errorbar=None)
+plt.title("Total Sales by Product Category")
+plt.xlabel("Category")
+plt.ylabel("Total Sales")
+plt.xticks(rotation=15)
+plt.tight_layout()
+plt.show()
+
+# Pie chart: Distribution of orders by category
+category_counts = df["Category"].value_counts()
+plt.figure(figsize=(7, 7))
+plt.pie(category_counts, labels=category_counts.index,
+        autopct="%1.1f%%", startangle=90)
+plt.title("Order Distribution by Category")
+plt.tight_layout()
+plt.show()
+
+# Box plot: Sales distribution by region
+plt.figure(figsize=(8, 5))
+sns.boxplot(data=df, x="Region", y="TotalSales")
+plt.title("Sales Distribution by Region")
+plt.xlabel("Region")
+plt.ylabel("Total Sales")
+plt.tight_layout()
+plt.show()
+
+print("\nSales analysis completed successfully!")
+
+# ============================================================
+# LINE-BY-LINE EXPLANATION
+# ============================================================
+# Lines 1-6: Comments show the practical name and terminal commands.
+# Line 7: pandas is used for reading, cleaning and analyzing tables.
+# Line 8: numpy is used to represent missing numerical values.
+# Line 9: matplotlib is used to display graphs.
+# Line 10: seaborn is used to create statistical graphs.
+# Lines 12-18: Create sample CSV sales records with column names.
+# Lines 20-26: Create Excel records, including a duplicate order
+#              and a missing unit price.
+# Lines 28-34: Create JSON records containing additional orders.
+# Lines 12-34: np.nan represents a missing value in the dataset.
+# Lines 36-38: Save the three DataFrames as CSV, Excel and JSON.
+# Line 41: Read the CSV file into a DataFrame.
+# Line 42: Read the Excel file into a DataFrame.
+# Line 43: Read the JSON file into a DataFrame.
+# Lines 45-50: Display the first five records from each file.
+# Line 53: Display the CSV column names, types and non-null counts.
+# Lines 55-58: Count missing values in each dataset.
+# Line 61: Combine all datasets vertically into one DataFrame.
+# Line 63: Display the number of rows and columns.
+# Line 64: Count completely duplicated rows.
+# Line 65: Count repeated order IDs.
+# Line 68: Remove repeated OrderID values, keeping the first record.
+# Line 69: Standardize category names, e.g. electronics to Electronics.
+# Line 70: Remove extra spaces and standardize region capitalization.
+# Line 71: Convert date strings into date values.
+# Line 72: Replace missing quantities with the median quantity.
+# Line 73: Replace missing prices with the median unit price.
+# Line 74: Remove records missing essential date or identity fields.
+# Line 75: Calculate sales by multiplying quantity and unit price.
+# Line 76: Extract the month name from each order date.
+# Line 79: Save the cleaned data as a CSV file.
+# Lines 81-84: Display the cleaned dataset and remaining missing values.
+# Line 85: Confirm that the cleaned file was saved.
+# Line 88: Calculate count, mean, standard deviation, minimum,
+#          quartiles and maximum for numerical columns.
+# Line 91: Add all order sales to calculate total sales.
+# Line 92: Calculate the mean sales value per order.
+# Line 93: Count distinct orders.
+# Line 96: Group records by category and add their sales.
+# Line 97: Sort category sales from highest to lowest.
+# Line 100: Group records by region and calculate total sales.
+# Line 103: Count orders belonging to each product category.
+# Line 106: Group sales by month and calculate monthly totals.
+# Line 109: Apply a grid style to the graphs.
+# Lines 112-119: Create and label the category-wise sales bar plot.
+# Line 120: Display the bar plot.
+# Line 123: Count orders in each product category.
+# Lines 124-127: Create and label the pie chart with percentages.
+# Line 128: Display the pie chart.
+# Lines 131-137: Create and label the regional sales box plot.
+# Line 138: Display the box plot.
+# Line 140: Print the final completion message.
+# ============================================================

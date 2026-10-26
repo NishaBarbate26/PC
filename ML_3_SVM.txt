@@ -1,0 +1,74 @@
+
+# VS CODE SETUP AND EXECUTION COMMANDS:
+# 1. Install libraries:
+#    python -m pip install scikit-learn matplotlib
+# 2. Run:
+#    python svm_digits.py
+
+import matplotlib.pyplot as plt
+from sklearn.datasets import load_digits
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+
+digits = load_digits()
+X = digits.data
+y = digits.target
+
+print("Dataset Shape:", X.shape)
+print("Digit Classes:", sorted(set(y)))
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+model = make_pipeline(
+    StandardScaler(),
+    SVC(kernel="rbf", C=10, gamma="scale")
+)
+
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+
+print("\nAccuracy:", round(accuracy_score(y_test, y_pred) * 100, 2), "%")
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred, zero_division=0))
+
+print("Confusion Matrix:")
+print(confusion_matrix(y_test, y_pred))
+
+fig, axes = plt.subplots(2, 5, figsize=(10, 5))
+
+for i, ax in enumerate(axes.flat):
+    ax.imshow(digits.images[i], cmap="gray")
+    ax.set_title("Digit: " + str(digits.target[i]))
+    ax.axis("off")
+
+plt.tight_layout()
+plt.show()
+
+index = 0
+print("\nSample Actual Digit:", y_test[index])
+print("Sample Predicted Digit:", model.predict([X_test[index]])[0])
+
+
+# LINE-BY-LINE EXPLANATION:
+# matplotlib: Displays handwritten digit images.
+# load_digits(): Loads images of handwritten digits from 0 to 9.
+# X: Contains 64 pixel features for every image.
+# y: Contains the correct digit labels.
+# train_test_split(): Divides data into training and testing sets.
+# test_size=0.2: Uses 20% of the data for testing.
+# stratify=y: Preserves the proportion of each digit class.
+# StandardScaler(): Standardizes features.
+# SVC(): Creates the Support Vector Machine classifier.
+# kernel="rbf": Uses a nonlinear decision boundary.
+# fit(): Trains the model on the training data.
+# predict(): Predicts the digit labels.
+# accuracy_score(): Calculates classification accuracy.
+# classification_report(): Displays precision, recall, and F1-score.
+# confusion_matrix(): Compares actual and predicted digit classes.
+# subplots(): Creates a grid to display sample digit images.
+# imshow(): Displays each digit image.

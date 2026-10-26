@@ -1,0 +1,180 @@
+
+# VS CODE SETUP AND EXECUTION COMMANDS:
+# 1. Keep uber.csv in the same folder as this Python file.
+# 2. Install libraries:
+#    python -m pip install pandas numpy matplotlib seaborn scikit-learn
+# 3. Run:
+#    python uber_regression.py
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LinearRegression, Ridge, Lasso
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+
+df = pd.read_csv("uber.csv")
+
+print("First Five Rows:")
+print(df.head())
+
+print("\nMissing Values:")
+print(df.isnull().sum())
+
+df = df.drop(columns=["Unnamed: 0", "key"], errors="ignore")
+df = df.dropna()
+
+df["pickup_datetime"] = pd.to_datetime(
+    df["pickup_datetime"], errors="coerce", utc=True
+)
+df = df.dropna(subset=["pickup_datetime"])
+
+df = df[
+    (df["fare_amount"] > 0) &
+    (df["pickup_longitude"].between(-75, -72)) &
+    (df["dropoff_longitude"].between(-75, -72)) &
+    (df["pickup_latitude"].between(40, 42)) &
+    (df["dropoff_latitude"].between(40, 42)) &
+    (df["passenger_count"].between(1, 6))
+].copy()
+
+df["pickup_hour"] = df["pickup_datetime"].dt.hour
+df["pickup_day"] = df["pickup_datetime"].dt.dayofweek
+
+lat1 = np.radians(df["pickup_latitude"])
+lat2 = np.radians(df["dropoff_latitude"])
+lon1 = np.radians(df["pickup_longitude"])
+lon2 = np.radians(df["dropoff_longitude"])
+
+a = (
+    np.sin((lat2 - lat1) / 2) ** 2
+    + np.cos(lat1) * np.cos(lat2)
+    * np.sin((lon2 - lon1) / 2) ** 2
+)
+
+df["distance_km"] = 6371 * 2 * np.arcsin(np.sqrt(np.clip(a, 0, 1)))
+df = df[df["distance_km"] > 0].copy()
+
+Q1 = df["fare_amount"].quantile(0.25)
+Q3 = df["fare_amount"].quantile(0.75)
+IQR = Q3 - Q1
+
+fare_outliers = (
+    (df["fare_amount"] < Q1 - 1.5 * IQR) |
+    (df["fare_amount"] > Q3 + 1.5 * IQR)
+)
+
+print("\nFare Outliers Detected:", int(fare_outliers.sum()))
+df = df[~fare_outliers].copy()
+
+Q1 = df["distance_km"].quantile(0.25)
+Q3 = df["distance_km"].quantile(0.75)
+IQR = Q3 - Q1
+
+distance_outliers = (
+    (df["distance_km"] < Q1 - 1.5 * IQR) |
+    (df["distance_km"] > Q3 + 1.5 * IQR)
+)
+
+print("Distance Outliers Detected:", int(distance_outliers.sum()))
+df = df[~distance_outliers].copy()
+
+print("\nDataset Shape After Preprocessing:", df.shape)
+
+features = [
+    "pickup_longitude", "pickup_latitude",
+    "dropoff_longitude", "dropoff_latitude",
+    "passenger_count", "pickup_hour", "pickup_day", "distance_km"
+]
+
+X = df[features]
+y = df["fare_amount"]
+
+plt.figure(figsize=(10, 7))
+sns.heatmap(
+    df[features + ["fare_amount"]].corr(),
+    annot=True, cmap="coolwarm", fmt=".2f"
+)
+plt.title("Correlation Heatmap")
+plt.tight_layout()
+plt.show()
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+models = {
+    "Linear Regression": LinearRegression(),
+    "Ridge Regression": Ridge(alpha=1.0),
+    "Lasso Regression": Lasso(alpha=0.01, max_iter=10000)
+}
+
+results = []
+trained_models = {}
+
+for name, model in models.items():
+    pipeline = make_pipeline(StandardScaler(), model)
+    pipeline.fit(X_train, y_train)
+    predictions = pipeline.predict(X_test)
+
+    results.append({
+        "Model": name,
+        "R2 Score": r2_score(y_test, predictions),
+        "RMSE": np.sqrt(mean_squared_error(y_test, predictions)),
+        "MAE": mean_absolute_error(y_test, predictions)
+    })
+
+    trained_models[name] = pipeline
+
+results_df = pd.DataFrame(results).sort_values(
+    "R2 Score", ascending=False
+)
+
+print("\nModel Comparison:")
+print(results_df.to_string(index=False))
+
+best_name = results_df.iloc[0]["Model"]
+print("\nBest Model:", best_name)
+
+sample_ride = pd.DataFrame([{
+    "pickup_longitude": -73.985,
+    "pickup_latitude": 40.748,
+    "dropoff_longitude": -73.977,
+    "dropoff_latitude": 40.752,
+    "passenger_count": 1,
+    "pickup_hour": 14,
+    "pickup_day": 2,
+    "distance_km": 1.0
+}])
+
+predicted_fare = trained_models[best_name].predict(sample_ride[features])[0]
+print("Estimated Fare for Sample Ride:", round(predicted_fare, 2))
+
+
+# LINE-BY-LINE EXPLANATION:
+# pandas: Loads and processes tabular data.
+# numpy: Performs numerical calculations.
+# matplotlib and seaborn: Display the correlation heatmap.
+# train_test_split: Separates training and testing data.
+# StandardScaler: Standardizes feature values.
+# LinearRegression: Builds a linear regression model.
+# Ridge: Applies L2 regularization.
+# Lasso: Applies L1 regularization.
+# read_csv(): Loads the local Uber CSV file.
+# dropna(): Removes records containing missing values.
+# to_datetime(): Converts pickup time into datetime format.
+# between(): Filters coordinates and passenger counts.
+# pickup_hour and pickup_day: Extract time-related features.
+# Haversine calculation: Estimates distance between pickup and drop-off.
+# IQR: Identifies outliers using quartiles.
+# corr(): Calculates correlations between numerical variables.
+# fit(): Trains each regression model.
+# predict(): Estimates fares from input features.
+# R2 Score: Measures how well predictions explain fare variation.
+# RMSE: Measures prediction error, penalizing larger errors.
+# MAE: Measures average absolute prediction error.
+# results_df: Compares the three models.
+# sample_ride: Contains example trip information for prediction.

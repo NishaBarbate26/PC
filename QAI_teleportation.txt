@@ -1,0 +1,76 @@
+
+# VS CODE SETUP AND EXECUTION COMMANDS:
+# 1. Install required libraries:
+#    python -m pip install qiskit qiskit-aer
+# 2. Run the program:
+#    python quantum_teleportation.py
+
+from qiskit import QuantumCircuit, transpile
+from qiskit_aer import AerSimulator
+
+theta = 1.2
+phi = 0.7
+shots = 1024
+
+qc = QuantumCircuit(3, 3)
+
+qc.ry(theta, 0)
+qc.rz(phi, 0)
+
+qc.h(1)
+qc.cx(1, 2)
+
+qc.cx(0, 1)
+qc.h(0)
+
+qc.measure(0, 0)
+qc.measure(1, 1)
+
+with qc.if_test((qc.clbits[1], 1)):
+    qc.x(2)
+
+with qc.if_test((qc.clbits[0], 1)):
+    qc.z(2)
+
+qc.rz(-phi, 2)
+qc.ry(-theta, 2)
+qc.measure(2, 2)
+
+backend = AerSimulator()
+compiled_qc = transpile(qc, backend)
+result = backend.run(compiled_qc, shots=shots).result()
+counts = result.get_counts()
+
+print("Quantum Teleportation Circuit:")
+print(qc.draw())
+
+print("\nMeasurement Results:")
+print(counts)
+
+success = sum(count for bits, count in counts.items()
+              if bits.replace(" ", "")[0] == "0")
+
+print("\nSuccessful state recovery:", success, "/", shots)
+print("Success percentage:", round(success * 100 / shots, 2), "%")
+
+
+# LINE-BY-LINE EXPLANATION:
+# QuantumCircuit: Creates a circuit with three qubits and three classical bits.
+# theta and phi: Define the initial quantum state to be teleported.
+# ry() and rz(): Prepare the initial state on qubit 0.
+# h(1): Creates superposition on qubit 1.
+# cx(1, 2): Entangles qubits 1 and 2 to create a Bell pair.
+# cx(0, 1): Entangles the state to teleport with qubit 1.
+# h(0): Completes Alice's Bell-basis measurement preparation.
+# measure(0, 0) and measure(1, 1): Measure Alice's two qubits.
+# if_test(): Applies a gate only when the specified classical bit is 1.
+# x(2): Applies the conditional bit-flip correction.
+# z(2): Applies the conditional phase-flip correction.
+# rz(-phi) and ry(-theta): Undo the original state preparation.
+# measure(2, 2): Checks whether the original state was recovered.
+# AerSimulator: Runs the circuit on a local quantum simulator.
+# transpile(): Converts the circuit into simulator-compatible instructions.
+# run(): Executes the circuit for the specified number of shots.
+# get_counts(): Retrieves the measurement results.
+# The first displayed bit represents classical bit 2, the recovery check.
+# A 0 in that position indicates successful state recovery.

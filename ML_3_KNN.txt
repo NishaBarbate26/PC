@@ -1,0 +1,83 @@
+
+# VS CODE SETUP AND EXECUTION COMMANDS:
+# 1. Keep Social_Network_Ads.csv in the same folder.
+# 2. Install libraries:
+#    python -m pip install pandas scikit-learn
+# 3. Run:
+#    python knn_social_ads.py
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import (
+    confusion_matrix, accuracy_score, precision_score, recall_score
+)
+
+df = pd.read_csv("Social_Network_Ads.csv")
+df.columns = df.columns.str.strip()
+
+print("First Five Rows:")
+print(df.head())
+
+df = df.dropna()
+
+target_column = next(
+    (col for col in df.columns if col.lower() in ["purchased", "purchase"]),
+    df.columns[-1]
+)
+
+X = df.drop(columns=[target_column])
+X = X.select_dtypes(include="number")
+y = df[target_column]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.25, random_state=42, stratify=y
+)
+
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+knn = KNeighborsClassifier(n_neighbors=5)
+knn.fit(X_train, y_train)
+
+y_pred = knn.predict(X_test)
+
+cm = confusion_matrix(y_test, y_pred)
+accuracy = accuracy_score(y_test, y_pred)
+error_rate = 1 - accuracy
+precision = precision_score(y_test, y_pred, zero_division=0)
+recall = recall_score(y_test, y_pred, zero_division=0)
+
+print("\nConfusion Matrix:")
+print(cm)
+
+print("\nAccuracy:", round(accuracy * 100, 2), "%")
+print("Error Rate:", round(error_rate * 100, 2), "%")
+print("Precision:", round(precision, 4))
+print("Recall:", round(recall, 4))
+
+
+# LINE-BY-LINE EXPLANATION:
+# pandas: Loads and processes the CSV dataset.
+# train_test_split(): Separates training and testing data.
+# StandardScaler(): Scales features to comparable ranges.
+# KNeighborsClassifier(): Creates the KNN classification model.
+# confusion_matrix(): Counts correct and incorrect predictions.
+# accuracy_score(): Calculates the proportion of correct predictions.
+# precision_score(): Measures the correctness of positive predictions.
+# recall_score(): Measures how many actual positive cases are identified.
+# read_csv(): Loads the local Social Network Ads dataset.
+# dropna(): Removes rows containing missing values.
+# target_column: Identifies the purchase label.
+# X: Contains numerical input features such as age and salary.
+# y: Contains the purchase class.
+# stratify=y: Preserves class proportions in the split.
+# fit_transform(): Scales the training features.
+# transform(): Scales the test features using training-set parameters.
+# n_neighbors=5: Uses the five nearest training samples.
+# fit(): Trains the KNN model.
+# predict(): Predicts whether a customer purchases the product.
+# error_rate: Calculates the proportion of incorrect predictions.
+# zero_division=0: Avoids undefined metric warnings.

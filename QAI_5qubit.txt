@@ -1,0 +1,80 @@
+
+# VS CODE SETUP AND EXECUTION COMMANDS:
+# 1. Install the required libraries:
+#    python -m pip install qiskit qiskit-aer matplotlib
+# 2. Run the program:
+#    python qft_5_qubits.py
+
+from qiskit import QuantumCircuit, transpile
+from qiskit.circuit.library import QFTGate
+from qiskit_aer import AerSimulator
+from qiskit.visualization import plot_histogram
+import matplotlib.pyplot as plt
+
+n = 5
+shots = 1024
+backend = AerSimulator()
+
+qc = QuantumCircuit(n)
+qc.x(0)
+qc.x(2)
+qc.x(4)
+qc.compose(QFTGate(n), inplace=True)
+qc.measure_all()
+
+print("Five-Qubit Quantum Fourier Transform Circuit:")
+print(qc.draw())
+
+compiled_qc = transpile(qc, backend)
+result = backend.run(compiled_qc, shots=shots).result()
+counts = result.get_counts()
+
+print("\nMeasurement results after QFT:")
+print(counts)
+
+plot_histogram(counts)
+plt.title("Five-Qubit Quantum Fourier Transform")
+plt.tight_layout()
+plt.savefig("qft_results.png")
+plt.show()
+
+verify = QuantumCircuit(n)
+verify.x(0)
+verify.x(2)
+verify.x(4)
+verify.compose(QFTGate(n), inplace=True)
+verify.compose(QFTGate(n).inverse(), inplace=True)
+verify.measure_all()
+
+compiled_verify = transpile(verify, backend)
+verify_result = backend.run(compiled_verify, shots=shots).result()
+verify_counts = verify_result.get_counts()
+
+print("\nQFT followed by Inverse QFT:")
+print(verify_counts)
+
+
+# LINE-BY-LINE EXPLANATION:
+# QuantumCircuit: Creates a quantum circuit.
+# QFTGate: Implements the Quantum Fourier Transform.
+# AerSimulator: Simulates quantum circuit execution.
+# transpile: Converts the circuit into simulator-compatible instructions.
+# plot_histogram: Displays measurement counts as a graph.
+# matplotlib.pyplot: Displays and saves the graph.
+# n = 5: Sets the number of qubits to five.
+# shots = 1024: Executes each circuit 1024 times.
+# AerSimulator(): Creates a local quantum simulator.
+# QuantumCircuit(n): Creates a circuit with five qubits.
+# x(0), x(2), x(4): Prepare the input state 10101.
+# compose(QFTGate(n)): Applies the five-qubit QFT.
+# measure_all(): Measures all qubits.
+# draw(): Displays the quantum circuit.
+# transpile(): Prepares the circuit for execution.
+# backend.run(): Executes the circuit on the simulator.
+# get_counts(): Retrieves the measurement counts.
+# plot_histogram(): Plots the measurement results.
+# savefig(): Saves the graph as qft_results.png.
+# verify circuit: Creates a second circuit for checking the QFT.
+# QFTGate(n).inverse(): Applies the inverse QFT.
+# QFT followed by inverse QFT should restore the original state.
+# verify_counts: Displays the measurement results after verification.

@@ -1,0 +1,122 @@
+
+# VS CODE SETUP AND EXECUTION COMMANDS:
+# 1. Keep Iris.csv in the same folder.
+# 2. Install libraries:
+#    python -m pip install pandas scikit-learn xgboost
+# 3. Run:
+#    python ensemble_iris.py
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+from sklearn.ensemble import (
+    VotingClassifier, RandomForestClassifier,
+    AdaBoostClassifier, GradientBoostingClassifier,
+    ExtraTreesClassifier
+)
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score,
+    f1_score, confusion_matrix, classification_report
+)
+from xgboost import XGBClassifier
+
+df = pd.read_csv("Iris.csv")
+df.columns = df.columns.str.strip()
+
+print("First Five Rows:")
+print(df.head())
+
+target_column = next(
+    (col for col in df.columns if col.lower() in ["species", "class", "target", "label"]),
+    df.columns[-1]
+)
+
+X = df.drop(columns=[target_column]).select_dtypes(include="number")
+X = X.drop(columns=["Id"], errors="ignore")
+y = df[target_column].astype(str)
+
+class_names = sorted(y.unique())
+class_mapping = {name: i for i, name in enumerate(class_names)}
+y_encoded = y.map(class_mapping)
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y_encoded, test_size=0.2, random_state=42, stratify=y_encoded
+)
+
+voting_model = VotingClassifier(
+    estimators=[
+        ("rf", RandomForestClassifier(n_estimators=100, random_state=42)),
+        ("et", ExtraTreesClassifier(n_estimators=100, random_state=42)),
+        ("gb", GradientBoostingClassifier(random_state=42))
+    ],
+    voting="hard"
+)
+
+models = {
+    "Voting Classifier": voting_model,
+    "AdaBoost": AdaBoostClassifier(n_estimators=50, random_state=42),
+    "Gradient Boosting": GradientBoostingClassifier(random_state=42),
+    "XGBoost": XGBClassifier(
+        n_estimators=100, max_depth=3, learning_rate=0.1,
+        objective="multi:softmax", num_class=len(class_names),
+        eval_metric="mlogloss", random_state=42
+    )
+}
+
+results = []
+
+for name, model in models.items():
+    pipeline = make_pipeline(StandardScaler(), model)
+    pipeline.fit(X_train, y_train)
+    y_pred = pipeline.predict(X_test)
+
+    results.append({
+        "Model": name,
+        "Accuracy": accuracy_score(y_test, y_pred),
+        "Precision": precision_score(y_test, y_pred, average="weighted", zero_division=0),
+        "Recall": recall_score(y_test, y_pred, average="weighted", zero_division=0),
+        "F1 Score": f1_score(y_test, y_pred, average="weighted", zero_division=0)
+    })
+
+    print("\n", name)
+    print("Confusion Matrix:")
+    print(confusion_matrix(y_test, y_pred))
+    print("\nClassification Report:")
+    print(classification_report(
+        y_test, y_pred,
+        labels=list(range(len(class_names))),
+        target_names=class_names,
+        zero_division=0
+    ))
+
+results_df = pd.DataFrame(results)
+print("\nModel Performance Comparison:")
+print(results_df.round(4).to_string(index=False))
+
+
+# LINE-BY-LINE EXPLANATION:
+# pandas: Loads and manages the Iris dataset.
+# train_test_split: Separates training and testing samples.
+# StandardScaler: Standardizes input features.
+# VotingClassifier: Combines predictions from multiple classifiers.
+# RandomForestClassifier: Uses multiple decision trees.
+# ExtraTreesClassifier: Uses randomized decision trees.
+# AdaBoostClassifier: Builds a sequence of models emphasizing prior errors.
+# GradientBoostingClassifier: Builds trees sequentially to reduce errors.
+# XGBClassifier: Implements gradient-boosted trees using XGBoost.
+# read_csv(): Loads Iris.csv.
+# target_column: Finds the species label column.
+# X: Contains numerical flower measurements.
+# y: Contains the original species names.
+# class_mapping: Converts species names into numeric labels.
+# stratify=y_encoded: Preserves class proportions during splitting.
+# voting="hard": Selects the class receiving the most votes.
+# fit(): Trains each model.
+# predict(): Predicts flower species.
+# accuracy_score(): Calculates overall accuracy.
+# precision_score(): Measures correctness of positive class predictions.
+# recall_score(): Measures how many actual samples are identified.
+# f1_score(): Calculates the harmonic mean of precision and recall.
+# confusion_matrix(): Compares actual and predicted classes.
+# results_df: Compares all models using evaluation metrics.

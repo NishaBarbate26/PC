@@ -1,0 +1,175 @@
+
+# Install required library:
+# python -m pip install numpy
+#
+# Run the program:
+# python tictactoe_rl.py
+
+import numpy as np
+import random
+
+# Initialize the board
+def create_board():
+    return [" "] * 9
+
+# Display the board
+def display_board(board):
+    for i in range(0, 9, 3):
+        print("|".join(board[i:i + 3]))
+        if i < 6:
+            print("-" * 5)
+
+# Check for a winner or draw
+def check_winner(board):
+    lines = [
+        (0, 1, 2), (3, 4, 5), (6, 7, 8),
+        (0, 3, 6), (1, 4, 7), (2, 5, 8),
+        (0, 4, 8), (2, 4, 6)
+    ]
+
+    for a, b, c in lines:
+        if board[a] != " " and board[a] == board[b] == board[c]:
+            return board[a]
+
+    if " " not in board:
+        return "Draw"
+
+    return None
+
+# Create the Q-table
+q_table = {}
+learning_rate = 0.7
+discount_factor = 0.9
+epsilon = 1.0
+episodes = 30000
+
+def get_state(board):
+    return "".join(board)
+
+def choose_action(board, explore=True):
+    state = get_state(board)
+    available = [i for i, cell in enumerate(board) if cell == " "]
+
+    if explore and random.random() < epsilon:
+        return random.choice(available)
+
+    if state not in q_table:
+        q_table[state] = np.zeros(9)
+
+    return max(available, key=lambda a: q_table[state][a])
+
+# Train the agent by playing against a random opponent
+for episode in range(episodes):
+    board = create_board()
+    done = False
+
+    while not done:
+        # Agent plays X
+        state = get_state(board)
+
+        if state not in q_table:
+            q_table[state] = np.zeros(9)
+
+        action = choose_action(board)
+        board[action] = "X"
+        result = check_winner(board)
+
+        if result == "X":
+            reward = 1
+            next_state = get_state(board)
+            q_table[state][action] += learning_rate * (
+                reward - q_table[state][action]
+            )
+            break
+        elif result == "Draw":
+            reward = 0.2
+            q_table[state][action] += learning_rate * (
+                reward - q_table[state][action]
+            )
+            break
+
+        # Random opponent plays O
+        available = [i for i, cell in enumerate(board) if cell == " "]
+        opponent_action = random.choice(available)
+        board[opponent_action] = "O"
+        result = check_winner(board)
+
+        if result == "O":
+            reward = -1
+            q_table[state][action] += learning_rate * (
+                reward - q_table[state][action]
+            )
+            break
+        elif result == "Draw":
+            reward = 0.2
+            q_table[state][action] += learning_rate * (
+                reward - q_table[state][action]
+            )
+            break
+
+        next_state = get_state(board)
+
+        if next_state not in q_table:
+            q_table[next_state] = np.zeros(9)
+
+        best_next = max(
+            q_table[next_state][a]
+            for a in range(9)
+            if board[a] == " "
+        )
+
+        q_table[state][action] += learning_rate * (
+            discount_factor * best_next - q_table[state][action]
+        )
+
+    epsilon = max(0.05, epsilon * 0.9998)
+
+# Test the trained agent against a random opponent
+wins = 0
+draws = 0
+losses = 0
+test_games = 100
+
+for game in range(test_games):
+    board = create_board()
+
+    while True:
+        action = choose_action(board, explore=False)
+        board[action] = "X"
+        result = check_winner(board)
+
+        if result:
+            if result == "X":
+                wins += 1
+            elif result == "Draw":
+                draws += 1
+            break
+
+        available = [i for i, cell in enumerate(board) if cell == " "]
+        opponent_action = random.choice(available)
+        board[opponent_action] = "O"
+        result = check_winner(board)
+
+        if result:
+            if result == "O":
+                losses += 1
+            elif result == "Draw":
+                draws += 1
+            break
+
+print("Testing Results (100 games)")
+print("Wins:", wins)
+print("Draws:", draws)
+print("Losses:", losses)
+
+# Display one sample game board
+print("\nSample Tic-Tac-Toe board:")
+display_board(board)
+
+# Explanation:
+# 1. Create a 3x3 board and define all winning combinations.
+# 2. Store state-action values in a Q-table.
+# 3. Train the X agent against a random O opponent.
+# 4. Reward wins, penalize losses, and reward draws slightly.
+# 5. Update Q-values using the Q-learning formula.
+# 6. Test the trained agent over 100 games and report wins, draws, and losses.
